@@ -1,0 +1,13 @@
+# Ignore documentation and old files
+docs/
+
+# Ignore compiled output
+out/
+
+# Ignore IDE files
+.idea/
+*.iml
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
