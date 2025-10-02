@@ -1,28 +1,46 @@
-
 package com.snakegame.model;
 
 import java.awt.Point;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class GameState {
+    private final Map<Integer, Player> players;
     private final Map<Integer, Snake> snakes;
-    private final Point fruit;
+    private final Map<Point, Integer> fruits;
+    private final List<Point> obstacles;
+    private final int level;
     private final boolean isGameOver;
 
-    public GameState(Map<Integer, Snake> snakes, Point fruit, boolean isGameOver) {
+    public GameState(Map<Integer, Player> players, Map<Integer, Snake> snakes, Map<Point, Integer> fruits, List<Point> obstacles, int level, boolean isGameOver) {
+        this.players = players;
         this.snakes = snakes;
-        this.fruit = fruit;
+        this.fruits = fruits;
+        this.obstacles = obstacles;
+        this.level = level;
         this.isGameOver = isGameOver;
+    }
+
+    public Map<Integer, Player> getPlayers() {
+        return players;
     }
 
     public Map<Integer, Snake> getSnakes() {
         return snakes;
     }
 
-    public Point getFruit() {
-        return fruit;
+    public Map<Point, Integer> getFruits() {
+        return fruits;
+    }
+
+    public List<Point> getObstacles() {
+        return obstacles;
+    }
+
+    public int getLevel() {
+        return level;
     }
 
     public boolean isGameOver() {
@@ -30,9 +48,16 @@ public class GameState {
     }
 
     public static GameState fromString(String data) {
+        Map<Integer, Player> players = new ConcurrentHashMap<>();
         Map<Integer, Snake> snakes = new ConcurrentHashMap<>();
-        Point fruit = null;
+        Map<Point, Integer> fruits = new ConcurrentHashMap<>();
+        List<Point> obstacles = new ArrayList<>();
+        int level = 1;
         boolean isGameOver = false;
+
+        if (data == null || data.isEmpty()) {
+            return new GameState(players, snakes, fruits, obstacles, level, true);
+        }
 
         String[] parts = data.split(";");
         for (String part : parts) {
@@ -43,7 +68,19 @@ public class GameState {
             String value = keyValue[1];
 
             switch (key) {
-                case "SNAKE":
+                case "LEVEL":
+                    level = Integer.parseInt(value);
+                    break;
+                case "PLAYER": {
+                    String[] playerData = value.split(",");
+                    int playerId = Integer.parseInt(playerData[0]);
+                    int score = Integer.parseInt(playerData[1]);
+                    Player player = new Player(playerId, "Player " + playerId);
+                    player.incrementScore(score); // Sets the score
+                    players.put(playerId, player);
+                    break;
+                }
+                case "SNAKE": {
                     String[] snakeData = value.split(",");
                     int playerId = Integer.parseInt(snakeData[0]);
                     Snake snake = new Snake(playerId, new Point(0, 0), 0);
@@ -55,21 +92,34 @@ public class GameState {
                     }
                     snakes.put(playerId, snake);
                     break;
-                case "FRUIT":
+                }
+                case "FRUIT": {
                     String[] fruitData = value.split(",");
-                    fruit = new Point(Integer.parseInt(fruitData[0]), Integer.parseInt(fruitData[1]));
+                    Point fruitPoint = new Point(Integer.parseInt(fruitData[0]), Integer.parseInt(fruitData[1]));
+                    int fruitValue = Integer.parseInt(fruitData[2]);
+                    fruits.put(fruitPoint, fruitValue);
                     break;
+                }
+                case "OBSTACLE": {
+                    String[] obsData = value.split(",");
+                    obstacles.add(new Point(Integer.parseInt(obsData[0]), Integer.parseInt(obsData[1])));
+                    break;
+                }
                 case "GAMEOVER":
                     isGameOver = Boolean.parseBoolean(value);
                     break;
             }
         }
-        return new GameState(snakes, fruit, isGameOver);
+        return new GameState(players, snakes, fruits, obstacles, level, isGameOver);
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
+        sb.append("LEVEL:").append(level).append(";");
+        for (Player player : players.values()) {
+            sb.append("PLAYER:").append(player.getId()).append(",").append(player.getScore()).append(";");
+        }
         for (Snake snake : snakes.values()) {
             sb.append("SNAKE:").append(snake.getPlayerId());
             for (Point p : snake.getBody()) {
@@ -77,8 +127,13 @@ public class GameState {
             }
             sb.append(";");
         }
-        if (fruit != null) {
-            sb.append("FRUIT:").append(fruit.x).append(",").append(fruit.y).append(";");
+        for (Map.Entry<Point, Integer> entry : fruits.entrySet()) {
+            Point p = entry.getKey();
+            Integer val = entry.getValue();
+            sb.append("FRUIT:").append(p.x).append(",").append(p.y).append(",").append(val).append(";");
+        }
+        for (Point p : obstacles) {
+            sb.append("OBSTACLE:").append(p.x).append(",").append(p.y).append(";");
         }
         sb.append("GAMEOVER:").append(isGameOver).append(";");
         return sb.toString();

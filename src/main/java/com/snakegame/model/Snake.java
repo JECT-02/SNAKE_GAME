@@ -33,9 +33,11 @@ public class Snake {
         body.removeLast();
     }
 
-    public void grow() {
-        Point tail = body.getLast();
-        body.addLast(new Point(tail));
+    public void grow(int amount) {
+        for (int i = 0; i < amount; i++) {
+            Point tail = body.getLast();
+            body.addLast(new Point(tail));
+        }
     }
 
     public LinkedList<Point> getBody() {

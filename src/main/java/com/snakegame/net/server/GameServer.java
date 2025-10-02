@@ -4,6 +4,7 @@ package com.snakegame.net.server;
 import com.snakegame.model.Direction;
 import com.snakegame.model.Game;
 import com.snakegame.model.GameConfig;
+import com.snakegame.model.GameState;
 import com.snakegame.net.SocketWrapper;
 
 import java.io.IOException;
@@ -19,18 +20,21 @@ public class GameServer {
     private final int port;
     private final Game game;
     private final Map<Integer, SocketWrapper> clients = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService gameLoop;
+    private ScheduledExecutorService gameLoopExecutor;
     private int nextPlayerId = 1;
+    private long initialSpeed = 200;
+    private long speedDecrement = 25;
+    private int currentLevel = 1;
 
     public GameServer(int port) {
         this.port = port;
-        GameConfig config = new GameConfig(40, 30, 5, 150);
+        GameConfig config = new GameConfig(40, 30, 5, (int) initialSpeed);
         this.game = new Game(config);
-        this.gameLoop = Executors.newSingleThreadScheduledExecutor();
+        this.gameLoopExecutor = Executors.newSingleThreadScheduledExecutor();
     }
 
     public void start() throws IOException {
-        gameLoop.scheduleAtFixedRate(this::updateAndBroadcast, 0, 150, TimeUnit.MILLISECONDS);
+        startGameLoop(initialSpeed);
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Server started on port " + port);
@@ -42,6 +46,10 @@ public class GameServer {
                 new Thread(handler).start();
             }
         }
+    }
+
+    private void startGameLoop(long speed) {
+        gameLoopExecutor.scheduleAtFixedRate(this::tick, 0, speed, TimeUnit.MILLISECONDS);
     }
 
     void addPlayer(SocketWrapper client) {
@@ -60,9 +68,22 @@ public class GameServer {
         game.setDirection(playerId, direction);
     }
 
-    private void updateAndBroadcast() {
+    private void tick() {
         game.update();
-        String gameStateString = game.getGameState().toString();
+        broadcastState(game.getGameState());
+
+        if (game.getLevel() > currentLevel) {
+            currentLevel = game.getLevel();
+            long newSpeed = Math.max(50, initialSpeed - (currentLevel - 1) * speedDecrement); // Ensure speed doesn't go below 50ms
+            System.out.println("Level up! New speed: " + newSpeed + "ms");
+            gameLoopExecutor.shutdown();
+            gameLoopExecutor = Executors.newSingleThreadScheduledExecutor();
+            startGameLoop(newSpeed);
+        }
+    }
+
+    private void broadcastState(GameState gameState) {
+        String gameStateString = gameState.toString();
         for (SocketWrapper client : clients.values()) {
             client.println(gameStateString);
         }
